@@ -186,13 +186,4 @@ export const thirdFormsApi = {
   generateReport: async (formData) => apiService.post("/third-forms/generate-report", formData),
 };
 
-export const usersApi = {
-  getAll: async () => apiService.get("/users"),
-  getById: async (id) => apiService.get(`/users/${id}`),
-  create: async (userData) => apiService.post("/users", userData),
-  update: async (id, userData) => apiService.patch(`/users/${id}`, userData),
-  delete: async (id) => apiService.delete(`/users/${id}`),
-  toggleActive: async (id) => apiService.patch(`/users/${id}/toggle-active`),
-};
-
 export default apiService;

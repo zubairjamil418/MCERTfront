@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../../contexts/AuthContext.jsx";
 import {
   IconButton,
   Tooltip,
@@ -13,7 +14,6 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Alert,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -22,9 +22,11 @@ import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { DataGrid } from "@mui/x-data-grid";
 import Card from "components/card";
-import { usersApi } from "../../../services/apiService";
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const UserManagement = () => {
+  const { authFetch } = useAuth();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -39,24 +41,19 @@ const UserManagement = () => {
     role: "user",
   });
   const [formErrors, setFormErrors] = useState({});
-  const [apiError, setApiError] = useState("");
-  const [lastAdded, setLastAdded] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const result = await usersApi.getAll();
-      if (result.success) {
-        setUsers(result.data);
-      } else {
-        console.error("Error fetching users:", result.error);
-      }
+      const response = await authFetch(`${BACKEND_URL}users`);
+      const data = await response.json();
+      setUsers(data);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authFetch]);
 
   useEffect(() => {
     fetchUsers();
@@ -80,7 +77,6 @@ const UserManagement = () => {
     setEditingUser(null);
     setFormData({ name: "", email: "", password: "", role: "user" });
     setFormErrors({});
-    setApiError("");
     setDialogOpen(true);
   };
 
@@ -93,37 +89,33 @@ const UserManagement = () => {
       role: user.role,
     });
     setFormErrors({});
-    setApiError("");
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    setApiError("");
     try {
       const payload = { ...formData };
       if (editingUser && !payload.password) {
         delete payload.password;
       }
-      let result;
+
       if (editingUser) {
-        result = await usersApi.update(editingUser._id, payload);
+        await authFetch(`${BACKEND_URL}users/${editingUser._id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
       } else {
-        result = await usersApi.create(payload);
-      }
-      if (!result.success) {
-        setApiError(result.error || "Failed to save user. Please try again.");
-        return;
-      }
-      if (!editingUser && result.data) {
-        setLastAdded(result.data);
+        await authFetch(`${BACKEND_URL}users`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
       }
       setDialogOpen(false);
-      await fetchUsers();
+      fetchUsers();
     } catch (error) {
       console.error("Error saving user:", error);
-      setApiError("An unexpected error occurred.");
     } finally {
       setSaving(false);
     }
@@ -132,15 +124,12 @@ const UserManagement = () => {
   const handleDelete = async () => {
     setSaving(true);
     try {
-      const result = await usersApi.delete(deletingUserId);
-      if (result.success) {
-        if (lastAdded && lastAdded._id === deletingUserId) setLastAdded(null);
-        setDeleteDialogOpen(false);
-        setDeletingUserId(null);
-        await fetchUsers();
-      } else {
-        console.error("Error deleting user:", result.error);
-      }
+      await authFetch(`${BACKEND_URL}users/${deletingUserId}`, {
+        method: "DELETE",
+      });
+      setDeleteDialogOpen(false);
+      setDeletingUserId(null);
+      fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
     } finally {
@@ -150,12 +139,10 @@ const UserManagement = () => {
 
   const handleToggleActive = async (user) => {
     try {
-      const result = await usersApi.toggleActive(user._id);
-      if (result.success) {
-        await fetchUsers();
-      } else {
-        console.error("Error toggling user status:", result.error);
-      }
+      await authFetch(`${BACKEND_URL}users/${user._id}/toggle-active`, {
+        method: "PATCH",
+      });
+      fetchUsers();
     } catch (error) {
       console.error("Error toggling user status:", error);
     }
@@ -287,16 +274,6 @@ const UserManagement = () => {
           </button>
         </div>
 
-        {lastAdded && (
-          <Alert
-            severity="success"
-            onClose={() => setLastAdded(null)}
-            className="mb-4"
-          >
-            User <strong>{lastAdded.name}</strong> ({lastAdded.email}) was added successfully.
-          </Alert>
-        )}
-
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
@@ -332,9 +309,6 @@ const UserManagement = () => {
           {editingUser ? "Edit User" : "Create New User"}
         </DialogTitle>
         <DialogContent className="flex flex-col gap-4 pt-4">
-          {apiError && (
-            <Alert severity="error" sx={{ mb: 1 }}>{apiError}</Alert>
-          )}
           <TextField
             label="Name"
             value={formData.name}
