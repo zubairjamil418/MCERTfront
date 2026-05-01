@@ -1036,6 +1036,8 @@ const Form2Page = () => {
         console.error('Error deleting form(s):', err);
       } finally {
         setIsDeletingForm(false);
+        setSelectedForms(new Set());
+        await fetchForms();
       }
     } else if (type === 'download') {
       try {
