@@ -154,6 +154,25 @@ const convertBase64ToFiles = (formData) => {
   return processedFormData;
 };
 
+// Normalize variable backend response wrappers to the actual form payload.
+const extractFormDataPayload = (payload) => {
+  if (!payload || typeof payload !== "object") return payload;
+
+  if (
+    payload.formData &&
+    typeof payload.formData === "object" &&
+    !Array.isArray(payload.formData)
+  ) {
+    return payload.formData;
+  }
+
+  if (payload.data) {
+    return extractFormDataPayload(payload.data);
+  }
+
+  return payload;
+};
+
 const FormPage = () => {
   const getAuthToken = () =>
     localStorage.getItem("token") || localStorage.getItem("authToken");
@@ -487,7 +506,7 @@ const FormPage = () => {
 
       if (result.success && result.data) {
         // formData is the actual stored form data (from file storage)
-        const responseData = result.data.formData || result.data.data || result.data;
+        const responseData = extractFormDataPayload(result.data);
         const mappedFormData = mapFormDataFromAPI(responseData);
         setFormData(mappedFormData);
         setOriginalFormData(mappedFormData); // Track original data for unsaved changes
@@ -952,11 +971,11 @@ const FormPage = () => {
         setHasUnsavedChanges(false);
         resetFormWithFixedFields();
       } else {
-        // alert(`Error: ${result.error || "Failed to save form"}`);
+        alert(`Error: ${result.error || "Failed to save form"}`);
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      // alert(`Error: ${handleApiError(error, "Failed to save form")}`);
+      alert(`Error: ${handleApiError(error, "Failed to save form")}`);
     } finally {
       setIsCreatingForm(false);
     }
